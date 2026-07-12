@@ -31,23 +31,125 @@ class BasePage:
         pause_ms = self._demo_action_pause_ms()
         try:
             locator.scroll_into_view_if_needed(timeout=3000)
-            box = locator.bounding_box()
-            if box is None:
+            marker_data = locator.evaluate(
+                """
+                (element, input) => {
+                  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+                  const usableRect = (rect) =>
+                    rect &&
+                    rect.width >= 2 &&
+                    rect.height >= 2 &&
+                    rect.right > 0 &&
+                    rect.bottom > 0 &&
+                    rect.left < viewportWidth &&
+                    rect.top < viewportHeight;
+                  const normalizeRect = (rect, source) => ({
+                    source,
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                    area: rect.width * rect.height,
+                  });
+                  const pointInsideElement = (x, y) => {
+                    const topNode = document.elementFromPoint(x, y);
+                    return Boolean(topNode && (topNode === element || element.contains(topNode)));
+                  };
+                  const pointForRect = (rect) => {
+                    const xs = [0.5, 0.38, 0.62, 0.25, 0.75];
+                    const ys = [0.5, 0.38, 0.62, 0.25, 0.75];
+                    for (const yRatio of ys) {
+                      for (const xRatio of xs) {
+                        const x = clamp(rect.left + rect.width * xRatio, 1, viewportWidth - 1);
+                        const y = clamp(rect.top + rect.height * yRatio, 1, viewportHeight - 1);
+                        if (pointInsideElement(x, y)) {
+                          return { x, y };
+                        }
+                      }
+                    }
+                    return {
+                      x: clamp(rect.left + rect.width / 2, 1, viewportWidth - 1),
+                      y: clamp(rect.top + rect.height / 2, 1, viewportHeight - 1),
+                    };
+                  };
+
+                  element.scrollIntoView({ block: "center", inline: "center" });
+
+                  const base = element.getBoundingClientRect();
+                  if (!usableRect(base)) return null;
+
+                  const baseRect = normalizeRect(base, "element");
+                  const tagName = element.tagName.toLowerCase();
+                  const isFormControl = ["input", "textarea", "select", "button"].includes(tagName);
+                  const candidateRects = [];
+
+                  if (isFormControl) {
+                    candidateRects.push(baseRect);
+                  } else {
+                    const textWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+                    let textNode = textWalker.nextNode();
+                    while (textNode) {
+                      if (textNode.textContent && textNode.textContent.trim()) {
+                        const range = document.createRange();
+                        range.selectNodeContents(textNode);
+                        for (const rect of range.getClientRects()) {
+                          if (usableRect(rect)) candidateRects.push(normalizeRect(rect, "text"));
+                        }
+                      }
+                      textNode = textWalker.nextNode();
+                    }
+
+                    const mediaNodes = element.querySelectorAll("img, svg, picture, .icon, [class*='icon']");
+                    for (const node of mediaNodes) {
+                      const style = window.getComputedStyle(node);
+                      if (style.display === "none" || style.visibility === "hidden") continue;
+                      const rect = node.getBoundingClientRect();
+                      if (usableRect(rect)) candidateRects.push(normalizeRect(rect, "media"));
+                    }
+
+                    candidateRects.push(baseRect);
+                  }
+
+                  candidateRects.sort((a, b) => {
+                    if (a.source !== b.source) {
+                      const order = { text: 0, media: 1, element: 2 };
+                      return order[a.source] - order[b.source];
+                    }
+                    return b.area - a.area;
+                  });
+
+                  const targetRect = candidateRects.find((rect) => {
+                    const point = pointForRect(rect);
+                    return pointInsideElement(point.x, point.y);
+                  }) || baseRect;
+                  const clickPoint = pointForRect(targetRect);
+                  const localX = clamp(clickPoint.x - baseRect.left, 1, Math.max(1, baseRect.width - 1));
+                  const localY = clamp(clickPoint.y - baseRect.top, 1, Math.max(1, baseRect.height - 1));
+
+                  return {
+                    action: input.action,
+                    label: input.label,
+                    pauseMs: input.pauseMs,
+                    left: targetRect.left,
+                    top: targetRect.top,
+                    width: targetRect.width,
+                    height: targetRect.height,
+                    clickX: clickPoint.x,
+                    clickY: clickPoint.y,
+                    localX,
+                    localY,
+                  };
+                }
+                """,
+                {"action": action, "label": label, "pauseMs": pause_ms},
+            )
+            if marker_data is None:
                 return None
 
-            local_x = box["width"] / 2
-            local_y = box["height"] / 2
-            marker_data = {
-                "action": action,
-                "label": label,
-                "pauseMs": pause_ms,
-                "left": box["x"],
-                "top": box["y"],
-                "width": box["width"],
-                "height": box["height"],
-                "clickX": box["x"] + local_x,
-                "clickY": box["y"] + local_y,
-            }
             self.page.evaluate(
                 """
                 (data) => {
@@ -72,12 +174,12 @@ class BasePage:
                   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
                   const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
                   const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-                  const outlineTop = Math.max(4, data.top - 6);
-                  const outlineLeft = Math.max(4, data.left - 6);
+                  const outlineTop = data.top - 6;
+                  const outlineLeft = data.left - 6;
                   const outlineWidth = Math.max(18, data.width + 12);
                   const outlineHeight = Math.max(18, data.height + 12);
-                  const clickX = clamp(data.clickX, 16, viewportWidth - 16);
-                  const clickY = clamp(data.clickY, 16, viewportHeight - 16);
+                  const clickX = data.clickX;
+                  const clickY = data.clickY;
 
                   const outline = document.createElement("div");
                   outline.dataset.codexDemoMarker = "true";
@@ -190,7 +292,7 @@ class BasePage:
                 marker_data,
             )
             self.page.wait_for_timeout(pause_ms)
-            return {"x": local_x, "y": local_y}
+            return {"x": marker_data["localX"], "y": marker_data["localY"]}
         except Exception:
             return None
 
