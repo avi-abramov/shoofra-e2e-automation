@@ -9,6 +9,9 @@ https://www.shoofra.co.il/
 This project now keeps one focused live-site demo instead of many slow page-by-page checks.
 It intentionally stops before real account creation, payment, or order submission.
 
+The test suite is intentionally small: one readable recruiter demo journey. If more independent
+coverage is added later, tests should be split by feature, such as account forms, navigation, and cart.
+
 ## Current Flow
 
 The single demo test covers:
@@ -34,9 +37,9 @@ The single demo test covers:
 Default visible speed is intentionally faster now:
 
 ```text
-SLOW_MO_MS=180
-TEST_PAUSE_MS=250
-DEMO_ACTION_PAUSE_MS=220
+SLOW_MO_MS=100
+TEST_PAUSE_MS=120
+DEMO_ACTION_PAUSE_MS=120
 ```
 
 ## Run Fast Headless
@@ -63,7 +66,7 @@ DEMO_ACTION_PAUSE_MS=220
 |       `-- shoofra_page.py
 `-- tests
     |-- conftest.py
-    `-- test_ordered_recruiter_demo_journey.py
+    `-- test_fast_recruiter_journey.py
 ```
 
 ## Notes

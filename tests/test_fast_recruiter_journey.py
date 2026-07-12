@@ -5,6 +5,8 @@ import pytest
 from src.pages.shoofra_page import ShoofraPage
 
 
+"""Fast end-to-end demo kept in one file because it is one recruiter-facing journey."""
+
 pytestmark = pytest.mark.e2e
 
 

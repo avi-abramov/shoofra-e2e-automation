@@ -1,7 +1,7 @@
 param(
-    [int]$SlowMoMs = 180,
-    [int]$PauseMs = 250,
-    [int]$ActionPauseMs = 220
+    [int]$SlowMoMs = 100,
+    [int]$PauseMs = 120,
+    [int]$ActionPauseMs = 120
 )
 
 $ErrorActionPreference = "Stop"

@@ -140,7 +140,13 @@ class ShoofraPage(BasePage):
         last_error: PlaywrightError | None = None
         for attempt in range(3):
             try:
-                self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+                try:
+                    self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except PlaywrightError:
+                    # The live site can keep the frame busy even when the document is usable.
+                    # Continue to body/title checks; those are the real signal we need here.
+                    pass
+
                 if self.page.url.startswith("chrome-error://"):
                     raise AssertionError("Shoofra navigation landed on a browser error page.")
 
