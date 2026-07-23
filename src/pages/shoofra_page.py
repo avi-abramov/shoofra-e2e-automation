@@ -132,6 +132,7 @@ class ShoofraPage(BasePage):
         with report_step(f"Open Shoofra page: {path or 'home'}"):
             self.goto_url(self.url_for(path))
             self.assert_not_blocked()
+            self.dismiss_optional_overlays()
             expect(self.locator("body")).to_be_visible()
             self.highlight_page_action(path or "Home page", "OPEN")
             self.assert_body_contains(*expected_texts)
@@ -163,6 +164,62 @@ class ShoofraPage(BasePage):
 
         if last_error is not None:
             raise last_error
+
+    def dismiss_optional_overlays(self) -> None:
+        selectors = (
+            ".mfp-close",
+            ".pum-close",
+            ".popup-close",
+            ".newsletter-close",
+            ".modal-close",
+            ".woocommerce-store-notice__dismiss-link",
+            "button[aria-label*='close' i]",
+        )
+        for selector in selectors:
+            controls = self.locator(selector)
+            for index in range(min(controls.count(), 3)):
+                control = controls.nth(index)
+                try:
+                    if control.is_visible(timeout=250):
+                        self.click_visible(control, "Dismiss optional overlay")
+                        self.page.wait_for_timeout(200)
+                        return
+                except Exception:
+                    continue
+
+    def assert_page_is_usable(self, minimum_text_length: int = 80) -> None:
+        with report_step("Verify page is usable"):
+            self.assert_not_blocked()
+            body = self.locator("body")
+            expect(body).to_be_visible()
+            body_text = body.inner_text(timeout=10000).strip()
+            assert len(body_text) >= minimum_text_length, (
+                f"Expected a usable page with at least {minimum_text_length} characters, "
+                f"found {len(body_text)}."
+            )
+
+    def assert_recruiter_header_links_present(self) -> None:
+        with report_step("Verify recruiter header links are available"):
+            for link_text, href_fragment in FAST_RECRUITER_HEADER_LINKS:
+                link = self._visible_link_with_destination(link_text, href_fragment)
+                expect(link).to_be_attached()
+                href = link.get_attribute("href") or ""
+                assert href_fragment.lower() in href.lower(), (
+                    f"Expected header link '{link_text}' to include '{href_fragment}', found '{href}'."
+                )
+
+    def open_category_and_first_product(self, category_path: str) -> None:
+        with report_step(f"Open category and first product: {category_path}"):
+            self.open(category_path)
+            self.assert_product_listing()
+            self.open_first_listed_product()
+
+    def assert_paths_are_usable(self, paths: Iterable[str]) -> None:
+        with report_step("Verify direct site pages are usable"):
+            for path in paths:
+                self.open(path)
+                expect(self.page).to_have_url(re.compile(re.escape(path.strip("/")), re.IGNORECASE))
+                self.assert_page_is_usable()
 
     def assert_body_contains(self, *texts: str) -> None:
         with report_step(f"Verify page text: {', '.join(texts)}"):
@@ -398,6 +455,10 @@ class ShoofraPage(BasePage):
             self.select_visible(size_select, f"{label} size", option_value)
             add_button = self.locator("button.single_add_to_cart_button").first
             self.click_visible(add_button, f"Add {label} to cart")
+            try:
+                self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+            except PlaywrightError:
+                pass
             expect(self.locator("body")).to_contain_text("סל")
 
     def try_add_current_product_to_cart(self, label: str) -> bool:
@@ -502,12 +563,16 @@ class ShoofraPage(BasePage):
             return 0
         quantities = self.locator(".woocommerce-cart-form__cart-item input.qty, tr.cart_item input.qty")
         if quantities.count() > 0:
-            return sum(
-                int(value)
-                for value in quantities.evaluate_all(
-                    "(nodes) => nodes.map((node) => node.value || node.getAttribute('value') || '0')"
-                )
+            raw_values = quantities.evaluate_all(
+                "(nodes) => nodes.map((node) => node.value || node.getAttribute('value') || '0')"
             )
+            total = 0
+            for value in raw_values:
+                try:
+                    total += int(str(value).strip() or "0")
+                except ValueError:
+                    total += 0
+            return total
         return rows.count()
 
     def assert_cart_contains_at_least(self, minimum_count: int) -> int:

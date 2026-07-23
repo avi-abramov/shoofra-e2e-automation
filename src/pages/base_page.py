@@ -170,6 +170,8 @@ class BasePage:
                   }
 
                   document.querySelectorAll("[data-codex-demo-marker]").forEach((node) => node.remove());
+                  window.__codexDemoActionIndex = (window.__codexDemoActionIndex || 0) + 1;
+                  const actionIndex = window.__codexDemoActionIndex;
 
                   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
                   const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
@@ -256,7 +258,7 @@ class BasePage:
 
                   const badge = document.createElement("div");
                   badge.dataset.codexDemoMarker = "true";
-                  badge.textContent = `${data.action}: ${data.label}`;
+                  badge.textContent = `#${actionIndex} ${data.action}: ${data.label}`;
                   const badgeTop = clickY > 72 ? clickY - 62 : clickY + 34;
                   const badgeLeft = clickX < viewportWidth / 2 ? clickX + 26 : clickX - 386;
                   Object.assign(badge.style, {
@@ -322,6 +324,8 @@ class BasePage:
                   }
 
                   document.querySelectorAll("[data-codex-demo-marker]").forEach((node) => node.remove());
+                  window.__codexDemoActionIndex = (window.__codexDemoActionIndex || 0) + 1;
+                  const actionIndex = window.__codexDemoActionIndex;
 
                   const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
                   const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
@@ -361,7 +365,7 @@ class BasePage:
 
                   const badge = document.createElement("div");
                   badge.dataset.codexDemoMarker = "true";
-                  badge.textContent = `${data.action}: ${data.label}`;
+                  badge.textContent = `#${actionIndex} ${data.action}: ${data.label}`;
                   Object.assign(badge.style, {
                     position: "fixed",
                     top: `${clickY + 34}px`,

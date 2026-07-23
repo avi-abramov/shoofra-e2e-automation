@@ -1,5 +1,5 @@
 param(
-    [string[]]$Target = @("tests", "-m", "smoke and not demo")
+    [string[]]$Target = @("tests")
 )
 
 $ErrorActionPreference = "Stop"

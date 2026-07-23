@@ -14,6 +14,7 @@ from src.core.reporting import (
     attach_text,
     write_allure_categories,
     write_allure_environment,
+    write_allure_executor,
 )
 from src.core.settings import PROJECT_ROOT, Settings, get_settings
 
@@ -193,4 +194,5 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     settings = get_settings()
     write_allure_environment(settings)
+    write_allure_executor()
     write_allure_categories()
